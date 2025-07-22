@@ -79,6 +79,25 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
         16: "其他补充材料"
       };
 
+      const itemNamesEn: Record<number, string> = {
+        1: "France-Visas application form and receipt",
+        2: "Passport",
+        3: "Passport photos",
+        4: "Flight reservation",
+        5: "Hotel booking confirmation",
+        6: "Travel insurance",
+        7: "Bank statements",
+        8: "Employment certificate",
+        9: "Business license",
+        10: "Household registration booklet",
+        11: "Identity card",
+        12: "Travel itinerary",
+        13: "Other fixed asset proofs",
+        14: "Marriage status certificate",
+        15: "TLScontact appointment confirmation",
+        16: "Other supplementary materials"
+      };
+
       const letter = `Dear Visa Officer,
 
 I am writing to respectfully request a tourist visa to France. I am ${personalInfo.name}, a Chinese citizen holding passport number ${personalInfo.passportNumber}.
@@ -87,20 +106,20 @@ PURPOSE OF VISIT:
 ${personalInfo.travelPurpose || "I plan to visit France for tourism purposes, to experience the rich culture, history, and beautiful landscapes that France has to offer."}
 
 TRAVEL DATES AND ITINERARY:
-${personalInfo.travelDates || "My planned travel dates are [请填写具体日期]"}
+${personalInfo.travelDates || "My planned travel dates are [Please specify dates]"}
 
 ${personalInfo.itinerary || "During my stay, I plan to visit major cities including Paris, Lyon, and Nice, exploring famous landmarks such as the Eiffel Tower, Louvre Museum, and the French Riviera."}
 
 SUPPORTING DOCUMENTS:
 I have prepared the following documents to support my visa application:
 
-${completedItems.map(id => `• ${itemNames[id]}`).join('\n')}
+${completedItems.map(id => `• ${itemNamesEn[id]}`).join('\n')}
 
 ${issueItems.length > 0 ? `
 SPECIAL CIRCUMSTANCES:
 I would like to explain the following circumstances regarding some of my documents:
 
-${issueItems.map(item => `• ${itemNames[item.id]}: ${item.description}`).join('\n')}
+${issueItems.map(item => `• ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
 
 Despite these circumstances, I have made every effort to provide alternative documentation and explanations to demonstrate my genuine intention to visit France and comply with all visa requirements.
 ` : ''}

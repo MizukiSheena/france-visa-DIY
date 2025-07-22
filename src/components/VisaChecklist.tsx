@@ -335,29 +335,47 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
   };
 
   const generateAISuggestion = async (id: number, issue: string) => {
-    // 这里可以集成真实的AI API
-    const suggestions: Record<number, string> = {
-      1: "如果无法访问官网，可以尝试使用VPN或联系法国领事馆获取纸质申请表。确保所有信息填写准确，特别是出行日期和目的。",
-      2: "如果护照有效期不足，请立即申请护照延期。如果空白页不够，可以申请加页服务。",
-      3: "如果现有照片不符合要求，建议到专业证件照摄影店重新拍摄，确保符合申根签证标准。",
-      4: "如果无法预订机票，可以通过旅行社代为预订，或者联系航空公司客服。确保预订单显示完整信息。",
-      5: "如果住朋友家，需要朋友提供邀请函和住房证明。如果是民宿，确保平台能提供正式预订确认单。",
-      6: "选择知名保险公司的申根旅游保险，确保保额达到3万欧元以上，覆盖整个行程期间。",
-      7: "如果银行流水余额不足，可以提供定期存款证明、股票基金等资产证明作为补充。",
-      8: "如果是自由职业者，可以提供税务登记证明、客户合同等证明工作稳定性的文件。",
-      9: "如果是个体户或自由职业者，提供相应的营业执照或税务登记证明。学生和退休人员无需此项。",
-      10: "如果是集体户口，提供集体户口首页复印件和个人页。确保信息与身份证一致。",
-      11: "确保身份证在有效期内，如即将到期请及时更换。复印件要清晰完整。",
-      12: "可以参考网上的行程模板，确保时间安排合理，包含主要景点和交通方式。",
-      13: "提供任何能证明在国内有约束力的资产证明，如房产、车辆、投资等。",
-      14: "根据实际婚姻状况提供相应证明，确保与户口本信息一致。",
-      15: "需要先完成France-Visas申请表获得FRA号码，然后在TLS官网预约递签时间。",
-      16: "根据个人情况提供相关补充材料，如学生证、工作证明等。"
-    };
+    try {
+      const itemTitle = VISA_ITEMS.find(item => item.id === id)?.title || `材料${id}`;
+      
+      const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer 21896386967961661493',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4.1',
+          messages: [
+            {
+              role: 'system',
+              content: '你是一个专业的法国签证申请顾问。用户在准备法国签证材料时遇到了问题，请提供具体、实用的解决方案和替代建议。回答要简洁明了，重点突出可行性。'
+            },
+            {
+              role: 'user',
+              content: `用户在准备法国签证材料"${itemTitle}"时遇到以下问题：${issue}。请提供具体的解决方案和替代建议。`
+            }
+          ],
+          stream: false,
+          max_tokens: 500,
+          temperature: 0.7
+        })
+      });
 
-    const suggestion = suggestions[id] || "建议咨询专业的签证代理机构或法国领事馆获取针对性建议。";
-    
-    updateItemStatus(id, { aiSuggestion: suggestion });
+      if (!response.ok) {
+        throw new Error(`API调用失败: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const suggestion = data.choices?.[0]?.message?.content || "抱歉，暂时无法获取AI建议，请稍后再试。";
+      
+      updateItemStatus(id, { aiSuggestion: suggestion });
+    } catch (error) {
+      console.error('AI建议生成失败:', error);
+      updateItemStatus(id, { 
+        aiSuggestion: "抱歉，AI服务暂时不可用。建议咨询专业的签证代理机构或法国领事馆获取针对性建议。" 
+      });
+    }
   };
 
   const completedCount = Object.values(itemStatuses).filter(status => status.completed).length;
