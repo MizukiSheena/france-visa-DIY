@@ -39,6 +39,8 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
   
   const [generatedLetter, setGeneratedLetter] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationCount, setGenerationCount] = useState(0);
+  const [hasReachedLimit, setHasReachedLimit] = useState(false);
   const { toast } = useToast();
 
   const updatePersonalInfo = (field: keyof PersonalInfo, value: string) => {
@@ -48,10 +50,20 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
     }));
   };
 
-  const generateCoverLetter = () => {
+  const generateCoverLetter = async () => {
+    if (generationCount >= 3) {
+      setHasReachedLimit(true);
+      toast({
+        title: "生成次数已用完",
+        description: "您已达到3次生成限制",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsGenerating(true);
     
-    setTimeout(() => {
+    try {
       const completedItems = Object.entries(itemStatuses)
         .filter(([_, status]) => status.completed)
         .map(([id]) => parseInt(id));
@@ -59,25 +71,6 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
       const issueItems = Object.entries(itemStatuses)
         .filter(([_, status]) => status.hasIssue)
         .map(([id, status]) => ({ id: parseInt(id), description: status.issueDescription }));
-
-      const itemNames: Record<number, string> = {
-        1: "France-Visas申请表和回执单",
-        2: "护照",
-        3: "照片",
-        4: "机票预订单",
-        5: "酒店预订确认",
-        6: "旅行保险",
-        7: "银行流水",
-        8: "在职证明",
-        9: "营业执照",
-        10: "户口本",
-        11: "身份证",
-        12: "行程单",
-        13: "其他固定资产证明",
-        14: "婚姻状况证明",
-        15: "TLScontact预约单",
-        16: "其他补充材料"
-      };
 
       const itemNamesEn: Record<number, string> = {
         1: "France-Visas application form and receipt",
@@ -98,66 +91,73 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
         16: "Other supplementary materials"
       };
 
-      const letter = `Dear Visa Officer,
+      // Call GPT API to generate personalized cover letter
+      const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer 21896386967961661493',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: "gpt-4.1",
+          messages: [
+            {
+              role: "user",
+              content: `Please generate a professional and polite cover letter in English for a France visa application based on the following information:
 
-I am writing to respectfully request a tourist visa to France. I am ${personalInfo.name}, a Chinese citizen holding passport number ${personalInfo.passportNumber}.
+Personal Information:
+- Name: ${personalInfo.name}
+- Passport Number: ${personalInfo.passportNumber}
+- Travel Purpose (in Chinese): ${personalInfo.travelPurpose}
+- Travel Dates (in Chinese): ${personalInfo.travelDates}
+- Itinerary (in Chinese): ${personalInfo.itinerary}
 
-PURPOSE OF VISIT:
-${personalInfo.travelPurpose || "I plan to visit France for tourism purposes, to experience the rich culture, history, and beautiful landscapes that France has to offer."}
+Completed Documents:
+${completedItems.map(id => `- ${itemNamesEn[id]}`).join('\n')}
 
-TRAVEL DATES AND ITINERARY:
-${personalInfo.travelDates || "My planned travel dates are [Please specify dates]"}
+Documents with Issues:
+${issueItems.map(item => `- ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
 
-${personalInfo.itinerary || "During my stay, I plan to visit major cities including Paris, Lyon, and Nice, exploring famous landmarks such as the Eiffel Tower, Louvre Museum, and the French Riviera."}
+Requirements:
+1. Translate any Chinese information into natural English
+2. Expand on travel purposes with realistic details about why visiting France
+3. Provide professional explanations for any document issues
+4. Emphasize strong ties to China and intention to return
+5. Use formal, respectful tone appropriate for visa application
+6. Include all standard sections: purpose, itinerary, documents, ties to China, financial capacity, compliance commitment
+7. Make it personalized based on the provided information
 
-SUPPORTING DOCUMENTS:
-I have prepared the following documents to support my visa application:
+The letter should be comprehensive, professional, and persuasive while maintaining honesty about any document limitations.`
+            }
+          ],
+          stream: false
+        }),
+      });
 
-${completedItems.map(id => `• ${itemNamesEn[id]}`).join('\n')}
+      if (!response.ok) {
+        throw new Error('API调用失败');
+      }
 
-${issueItems.length > 0 ? `
-SPECIAL CIRCUMSTANCES:
-I would like to explain the following circumstances regarding some of my documents:
+      const data = await response.json();
+      const generatedContent = data.choices[0].message.content;
 
-${issueItems.map(item => `• ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
-
-Despite these circumstances, I have made every effort to provide alternative documentation and explanations to demonstrate my genuine intention to visit France and comply with all visa requirements.
-` : ''}
-
-TIES TO CHINA:
-I have strong ties to China that ensure my return after my visit to France:
-• Stable employment with my current company
-• Family responsibilities and relationships in China
-• Property and financial assets in China
-• Educational and professional commitments requiring my presence in China
-
-FINANCIAL CAPACITY:
-I have sufficient financial resources to cover all expenses during my stay in France, as evidenced by my bank statements and supporting financial documents.
-
-COMPLIANCE COMMITMENT:
-I solemnly declare that:
-• All information provided is true and accurate
-• I will comply with all French laws and regulations during my stay
-• I will not engage in any unauthorized activities
-• I will depart France before my visa expires and return to China
-
-I respectfully request that you grant me a tourist visa to France. I am confident that my application demonstrates both my genuine intention to visit France for tourism purposes and my commitment to returning to China after my visit.
-
-Thank you for your time and consideration. I look forward to your favorable response.
-
-Yours sincerely,
-
-${personalInfo.name}
-Date: ${new Date().toLocaleDateString('en-GB')}`;
-
-      setGeneratedLetter(letter);
+      setGeneratedLetter(generatedContent);
+      setGenerationCount(prev => prev + 1);
       setIsGenerating(false);
       
       toast({
         title: "Cover Letter生成成功",
-        description: "您的签证申请信已生成完成"
+        description: `您的签证申请信已生成完成 (剩余${2 - generationCount}次)`
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Error generating cover letter:', error);
+      setIsGenerating(false);
+      toast({
+        title: "生成失败",
+        description: "请稍后重试",
+        variant: "destructive"
+      });
+    }
   };
 
   const copyToClipboard = () => {
@@ -265,14 +265,20 @@ Date: ${new Date().toLocaleDateString('en-GB')}`;
 
             <Separator />
 
-            <Button
-              onClick={generateCoverLetter}
-              className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all duration-200"
-              disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              {isGenerating ? "正在生成..." : "生成Cover Letter"}
-            </Button>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center text-sm text-muted-foreground">
+                <span>生成次数</span>
+                <span>{generationCount}/3</span>
+              </div>
+              <Button
+                onClick={generateCoverLetter}
+                className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all duration-200"
+                disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber || generationCount >= 3}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {isGenerating ? "正在生成..." : generationCount >= 3 ? "已达到生成限制" : "生成Cover Letter"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
