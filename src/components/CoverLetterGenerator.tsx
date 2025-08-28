@@ -99,7 +99,7 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: "gpt-4.1",
+          model: "gpt-4o-mini",
           messages: [
             {
               role: "user",
@@ -135,7 +135,8 @@ The letter should be comprehensive, professional, and persuasive while maintaini
       });
 
       if (!response.ok) {
-        throw new Error('API调用失败');
+        const errorText = await response.text();
+        throw new Error(`API调用失败: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
@@ -154,7 +155,7 @@ The letter should be comprehensive, professional, and persuasive while maintaini
       setIsGenerating(false);
       toast({
         title: "生成失败",
-        description: "请稍后重试",
+        description: error instanceof Error ? error.message : "请稍后重试",
         variant: "destructive"
       });
     }

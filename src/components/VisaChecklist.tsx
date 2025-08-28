@@ -345,7 +345,7 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          model: 'gpt-4.1',
+          model: 'gpt-4o-mini',
           messages: [
             {
               role: 'system',
@@ -363,7 +363,8 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
       });
 
       if (!response.ok) {
-        throw new Error(`API调用失败: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`API调用失败: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
