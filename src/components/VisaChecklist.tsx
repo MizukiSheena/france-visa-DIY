@@ -12,8 +12,16 @@ import {
   ChevronUp, 
   FileText,
   Lightbulb,
-  MessageSquare
+  MessageSquare,
+  Lock,
+  Key
 } from "lucide-react";
+import { generateDocumentSuggestion, hasReachedFreeLimit, getRemainingGenerations, getUserApiKey } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { setUserApiKey } from "@/lib/api";
 
 interface VisaItem {
   id: number;
@@ -305,6 +313,10 @@ const VISA_ITEMS: VisaItem[] = [
 const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
   const [itemStatuses, setItemStatuses] = useState<Record<number, ItemStatus>>({});
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const [isGeneratingSuggestion, setIsGeneratingSuggestion] = useState(false);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const { toast } = useToast();
 
   const updateItemStatus = (id: number, updates: Partial<ItemStatus>) => {
     setItemStatuses(prev => ({
@@ -335,48 +347,53 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
   };
 
   const generateAISuggestion = async (id: number, issue: string) => {
+    if (hasReachedFreeLimit() && !getUserApiKey()) {
+      setShowApiKeyDialog(true);
+      return;
+    }
+
+    setIsGeneratingSuggestion(true);
     try {
       const itemTitle = VISA_ITEMS.find(item => item.id === id)?.title || `材料${id}`;
       
-      const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer 21896386967961661493',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: '你是一个专业的法国签证申请顾问。用户在准备法国签证材料时遇到了问题，请提供具体、实用的解决方案和替代建议。回答要简洁明了，重点突出可行性。'
-            },
-            {
-              role: 'user',
-              content: `用户在准备法国签证材料"${itemTitle}"时遇到以下问题：${issue}。请提供具体的解决方案和替代建议。`
-            }
-          ],
-          stream: false,
-          max_tokens: 500,
-          temperature: 0.7
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API调用失败: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      const suggestion = data.choices?.[0]?.message?.content || "抱歉，暂时无法获取AI建议，请稍后再试。";
+      const suggestion = await generateDocumentSuggestion(itemTitle, issue);
       
       updateItemStatus(id, { aiSuggestion: suggestion });
+      toast({
+        title: "AI建议生成成功",
+        description: "已获取针对您问题的专业建议"
+      });
     } catch (error) {
       console.error('AI建议生成失败:', error);
       updateItemStatus(id, { 
         aiSuggestion: "抱歉，AI服务暂时不可用。建议咨询专业的签证代理机构或法国领事馆获取针对性建议。" 
       });
+      toast({
+        title: "生成失败",
+        description: error instanceof Error ? error.message : "请稍后再试",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingSuggestion(false);
     }
+  };
+
+  const handleSetApiKey = () => {
+    if (!customApiKey.trim()) {
+      toast({
+        title: "API Key无效",
+        description: "请输入有效的API Key",
+        variant: "destructive"
+      });
+      return;
+    }
+    setUserApiKey(customApiKey.trim());
+    setShowApiKeyDialog(false);
+    setCustomApiKey('');
+    toast({
+      title: "API Key设置成功",
+      description: "现在您可以无限制使用AI服务"
+    });
   };
 
   const completedCount = Object.values(itemStatuses).filter(status => status.completed).length;
@@ -515,9 +532,10 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
                           variant="outline"
                           size="sm"
                           className="w-full"
+                          disabled={isGeneratingSuggestion}
                         >
                           <MessageSquare className="w-4 h-4 mr-2" />
-                          获取AI建议
+                          {isGeneratingSuggestion ? "正在生成..." : "获取AI建议"}
                         </Button>
 
                         {status.aiSuggestion && (
@@ -547,6 +565,54 @@ const VisaChecklist = ({ onGenerateCoverLetter }: VisaChecklistProps) => {
           生成Cover Letter
         </Button>
       </div>
+
+      <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              设置API Key
+            </DialogTitle>
+            <DialogDescription>
+              您已达到免费生成次数限制。输入您自己的GLM API Key以继续使用AI服务。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key">GLM API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="请输入您的GLM API Key"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                获取API Key：访问智谱AI官网 (https://open.bigmodel.cn/) 注册并获取API Key
+              </p>
+              <p className="text-sm text-muted-foreground">
+                设置后您将无限制使用AI建议和Cover Letter生成功能
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowApiKeyDialog(false);
+                setCustomApiKey('');
+              }}
+            >
+              取消
+            </Button>
+            <Button onClick={handleSetApiKey}>
+              确认设置
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -5,8 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Download, FileText, User, Calendar, MapPin } from "lucide-react";
+import { Copy, Download, FileText, User, Calendar, MapPin, Key } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { generateCoverLetter as generateCoverLetterApi, hasReachedFreeLimit, getRemainingGenerations, getUserApiKey, incrementGenerationCount, setUserApiKey } from "@/lib/api";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ItemStatus {
   completed: boolean;
@@ -39,8 +41,9 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
   
   const [generatedLetter, setGeneratedLetter] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
-  const [generationCount, setGenerationCount] = useState(0);
-  const [hasReachedLimit, setHasReachedLimit] = useState(false);
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const generationCount = getRemainingGenerations();
   const { toast } = useToast();
 
   const updatePersonalInfo = (field: keyof PersonalInfo, value: string) => {
@@ -50,14 +53,9 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
     }));
   };
 
-  const generateCoverLetter = async () => {
-    if (generationCount >= 3) {
-      setHasReachedLimit(true);
-      toast({
-        title: "生成次数已用完",
-        description: "您已达到3次生成限制",
-        variant: "destructive"
-      });
+  const handleGenerateCoverLetter = async () => {
+    if (hasReachedFreeLimit() && !getUserApiKey()) {
+      setShowApiKeyDialog(true);
       return;
     }
 
@@ -66,99 +64,72 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
     try {
       const completedItems = Object.entries(itemStatuses)
         .filter(([_, status]) => status.completed)
-        .map(([id]) => parseInt(id));
+        .map(([id]) => {
+          const itemNamesEn: Record<number, string> = {
+            1: "France-Visas application form and receipt",
+            2: "Passport",
+            3: "Passport photos",
+            4: "Flight reservation",
+            5: "Hotel booking confirmation",
+            6: "Travel insurance",
+            7: "Bank statements",
+            8: "Employment certificate",
+            9: "Business license",
+            10: "Household registration booklet",
+            11: "Identity card",
+            12: "Travel itinerary",
+            13: "Other fixed asset proofs",
+            14: "Marriage status certificate",
+            15: "TLScontact appointment confirmation",
+            16: "Other supplementary materials"
+          };
+          return itemNamesEn[parseInt(id)];
+        });
       
       const issueItems = Object.entries(itemStatuses)
         .filter(([_, status]) => status.hasIssue)
         .map(([id, status]) => ({ id: parseInt(id), description: status.issueDescription }));
 
-      const itemNamesEn: Record<number, string> = {
-        1: "France-Visas application form and receipt",
-        2: "Passport",
-        3: "Passport photos",
-        4: "Flight reservation",
-        5: "Hotel booking confirmation",
-        6: "Travel insurance",
-        7: "Bank statements",
-        8: "Employment certificate",
-        9: "Business license",
-        10: "Household registration booklet",
-        11: "Identity card",
-        12: "Travel itinerary",
-        13: "Other fixed asset proofs",
-        14: "Marriage status certificate",
-        15: "TLScontact appointment confirmation",
-        16: "Other supplementary materials"
-      };
-
-      // Call GPT API to generate personalized cover letter
-      const response = await fetch('https://aigc.sankuai.com/v1/openai/native/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': 'Bearer 21896386967961661493',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "user",
-              content: `Please generate a professional and polite cover letter in English for a France visa application based on the following information:
-
-Personal Information:
-- Name: ${personalInfo.name}
-- Passport Number: ${personalInfo.passportNumber}
-- Travel Purpose (in Chinese): ${personalInfo.travelPurpose}
-- Travel Dates (in Chinese): ${personalInfo.travelDates}
-- Itinerary (in Chinese): ${personalInfo.itinerary}
-
-Completed Documents:
-${completedItems.map(id => `- ${itemNamesEn[id]}`).join('\n')}
-
-Documents with Issues:
-${issueItems.map(item => `- ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
-
-Requirements:
-1. Translate any Chinese information into natural English
-2. Expand on travel purposes with realistic details about why visiting France
-3. Provide professional explanations for any document issues
-4. Emphasize strong ties to China and intention to return
-5. Use formal, respectful tone appropriate for visa application
-6. Include all standard sections: purpose, itinerary, documents, ties to China, financial capacity, compliance commitment
-7. Make it personalized based on the provided information
-
-The letter should be comprehensive, professional, and persuasive while maintaining honesty about any document limitations.`
-            }
-          ],
-          stream: false
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API调用失败: ${response.status} ${errorText}`);
-      }
-
-      const data = await response.json();
-      const generatedContent = data.choices[0].message.content;
-
-      setGeneratedLetter(generatedContent);
-      setGenerationCount(prev => prev + 1);
-      setIsGenerating(false);
+      const letter = await generateCoverLetterApi(personalInfo, completedItems, issueItems);
+      setGeneratedLetter(letter);
       
+      if (!getUserApiKey()) {
+        incrementGenerationCount();
+      }
+      
+      const remaining = getUserApiKey() ? -1 : getRemainingGenerations();
       toast({
         title: "Cover Letter生成成功",
-        description: `您的签证申请信已生成完成 (剩余${2 - generationCount}次)`
+        description: remaining === -1 ? "您的签证申请信已生成完成" : `您的签证申请信已生成完成 (剩余${remaining}次)`
       });
     } catch (error) {
       console.error('Error generating cover letter:', error);
-      setIsGenerating(false);
       toast({
         title: "生成失败",
         description: error instanceof Error ? error.message : "请稍后重试",
         variant: "destructive"
       });
+    } finally {
+      setIsGenerating(false);
     }
+  };
+
+  const handleSetApiKey = () => {
+    if (!customApiKey.trim()) {
+      toast({
+        title: "API Key无效",
+        description: "请输入有效的API Key",
+        variant: "destructive"
+      });
+      return;
+    }
+    setUserApiKey(customApiKey.trim());
+    setShowApiKeyDialog(false);
+    setCustomApiKey('');
+    toast({
+      title: "API Key设置成功",
+      description: "现在您可以无限制使用AI服务"
+    });
   };
 
   const copyToClipboard = () => {
@@ -269,15 +240,15 @@ The letter should be comprehensive, professional, and persuasive while maintaini
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>生成次数</span>
-                <span>{generationCount}/3</span>
+                <span>{getUserApiKey() ? '无限制' : `${3 - generationCount}/3`}</span>
               </div>
               <Button
-                onClick={generateCoverLetter}
+                onClick={handleGenerateCoverLetter}
                 className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all duration-200"
-                disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber || generationCount >= 3}
+                disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber || (getUserApiKey() ? false : generationCount >= 3)}
               >
                 <FileText className="w-4 h-4 mr-2" />
-                {isGenerating ? "正在生成..." : generationCount >= 3 ? "已达到生成限制" : "生成Cover Letter"}
+                {isGenerating ? "正在生成..." : getUserApiKey() ? "生成Cover Letter" : generationCount >= 3 ? "已达到生成限制" : "生成Cover Letter"}
               </Button>
             </div>
           </CardContent>
@@ -323,6 +294,54 @@ The letter should be comprehensive, professional, and persuasive while maintaini
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              设置API Key
+            </DialogTitle>
+            <DialogDescription>
+              您已达到免费生成次数限制。输入您自己的GLM API Key以继续使用AI服务。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="api-key">GLM API Key</Label>
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="请输入您的GLM API Key"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                获取API Key：访问智谱AI官网 (https://open.bigmodel.cn/) 注册并获取API Key
+              </p>
+              <p className="text-sm text-muted-foreground">
+                设置后您将无限制使用AI建议和Cover Letter生成功能
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowApiKeyDialog(false);
+                setCustomApiKey('');
+              }}
+            >
+              取消
+            </Button>
+            <Button onClick={handleSetApiKey}>
+              确认设置
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

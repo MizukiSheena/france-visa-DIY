@@ -21,7 +21,7 @@ const PasswordGate = ({ onAccessGranted }: PasswordGateProps) => {
 
     // 模拟验证过程
     setTimeout(() => {
-      if (password === "visa2024") { // 这里可以根据需要修改密码
+      if (password === "francevisa2026") { // 访问密码
         onAccessGranted();
         toast({
           title: "验证成功",

@@ -6,7 +6,19 @@
 
 **网站地址：** https://mizukisheena.github.io/france-visa-DIY/
 
+**访问码：** francevisa2026
+
 ## ✨ 功能特性
+
+### 🔐 访问码保护
+- **安全访问**：用户需要输入正确的访问码才能使用服务
+- **付费控制**：管理员通过提供访问码控制用户访问权限
+
+### 🎯 GLM 4.7 AI 集成
+- **智能建议**：使用 GLM 4.7 模型提供专业的签证申请建议
+- **Cover Letter 生成**：基于用户信息自动生成专业的签证申请信
+- **使用限制**：免费用户可使用3次，超过后需要配置自己的 API Key
+- **自定义 API**：用户可配置自己的 GLM API Key 获得无限制使用权限
 
 ### 📋 智能签证清单
 - **完整材料清单**：涵盖法国签证申请所需的所有必要文件
@@ -53,24 +65,45 @@
 - Node.js 18+
 - npm 或 yarn
 
-### 安装依赖
+### 1. 安装依赖
 ```bash
 npm install
 ```
 
-### 启动开发服务器
+### 2. 配置环境变量
+
+复制 `.env.example` 文件为 `.env`：
+```bash
+cp .env.example .env
+```
+
+编辑 `.env` 文件，填入您的 GLM API Key：
+```env
+# GLM API Configuration
+VITE_GLM_API_KEY=your_actual_glm_api_key_here
+VITE_GLM_API_ENDPOINT=https://open.bigmodel.cn/api/paas/v4/chat/completions
+VITE_GLM_MODEL=glm-4
+VITE_FREE_GENERATION_LIMIT=3
+```
+
+**获取 GLM API Key：**
+1. 访问智谱AI官网：https://open.bigmodel.cn/
+2. 注册账号并登录
+3. 在控制台创建应用并获取 API Key
+
+### 3. 启动开发服务器
 ```bash
 npm run dev
 ```
 
-访问 http://localhost:8080 查看应用
+访问 http://localhost:8080 查看应用，使用访问码 `francevisa2026` 登录
 
-### 构建生产版本
+### 4. 构建生产版本
 ```bash
 npm run build
 ```
 
-### 预览生产版本
+### 5. 预览生产版本
 ```bash
 npm run preview
 ```
