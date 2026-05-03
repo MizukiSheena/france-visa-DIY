@@ -5,7 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Copy, Download, FileText, User, Calendar, MapPin, Key } from "lucide-react";
+import { Copy, Download, FileText, User, Calendar, MapPin, Key, DollarSign, Briefcase, GraduationCap, Home, Heart } from "lucide-react";
+import { Document, Packer, Paragraph, TextRun } from "docx";
+import { saveAs } from "file-saver";
 import { useToast } from "@/hooks/use-toast";
 import { generateCoverLetter as generateCoverLetterApi, hasReachedFreeLimit, getRemainingGenerations, getUserApiKey, incrementGenerationCount, setUserApiKey } from "@/lib/api";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -28,6 +30,10 @@ interface PersonalInfo {
   travelPurpose: string;
   travelDates: string;
   itinerary: string;
+  employmentStatus: 'employed' | 'student' | 'retired' | 'unemployed' | 'self-employed';
+  fundingSource: 'salary' | 'parents' | 'pension' | 'unemployment-benefits' | 'savings' | 'other';
+  maritalStatus: 'single' | 'married-spouse-in-china' | 'married-spouse-abroad' | 'divorced' | 'widowed';
+  hasAssetsInChina: boolean;
 }
 
 const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProps) => {
@@ -36,7 +42,11 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
     passportNumber: "",
     travelPurpose: "",
     travelDates: "",
-    itinerary: ""
+    itinerary: "",
+    employmentStatus: "employed",
+    fundingSource: "salary",
+    maritalStatus: "single",
+    hasAssetsInChina: false
   });
   
   const [generatedLetter, setGeneratedLetter] = useState("");
@@ -140,21 +150,34 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
     });
   };
 
-  const downloadLetter = () => {
-    const blob = new Blob([generatedLetter], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `France_Visa_Cover_Letter_${personalInfo.name || 'Applicant'}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    toast({
-      title: "下载完成",
-      description: "Cover Letter已保存到您的设备"
-    });
+  const downloadLetter = async () => {
+    try {
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: generatedLetter.split('\n').map(line => 
+            new Paragraph({
+              children: [new TextRun(line || '')]
+            })
+          )
+        }]
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `France_Visa_Cover_Letter_${personalInfo.name || 'Applicant'}.docx`);
+      
+      toast({
+        title: "下载完成",
+        description: "Cover Letter已保存为Word文档"
+      });
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      toast({
+        title: "下载失败",
+        description: "请稍后重试",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -233,6 +256,80 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
                 placeholder="简要描述您的行程安排，包括计划访问的城市和景点"
                 rows={4}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                身份状态
+              </Label>
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={personalInfo.employmentStatus}
+                onChange={(e) => updatePersonalInfo('employmentStatus', e.target.value as PersonalInfo['employmentStatus'])}
+              >
+                <option value="employed">在职人员</option>
+                <option value="student">学生</option>
+                <option value="retired">退休人员</option>
+                <option value="unemployed">失业</option>
+                <option value="self-employed">自由职业/个体户</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                资金来源
+              </Label>
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={personalInfo.fundingSource}
+                onChange={(e) => updatePersonalInfo('fundingSource', e.target.value as PersonalInfo['fundingSource'])}
+              >
+                <option value="salary">工资收入</option>
+                <option value="parents">父母资助</option>
+                <option value="pension">退休金</option>
+                <option value="unemployment-benefits">失业保险</option>
+                <option value="savings">个人储蓄</option>
+                <option value="other">其他</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                婚姻状况
+              </Label>
+              <select
+                className="w-full px-3 py-2 border rounded-md bg-background"
+                value={personalInfo.maritalStatus}
+                onChange={(e) => updatePersonalInfo('maritalStatus', e.target.value as PersonalInfo['maritalStatus'])}
+              >
+                <option value="single">单身</option>
+                <option value="married-spouse-in-china">已婚（配偶在国内）</option>
+                <option value="married-spouse-abroad">已婚（配偶在国外）</option>
+                <option value="divorced">离异</option>
+                <option value="widowed">丧偶</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Home className="w-4 h-4" />
+                中国境内资产
+              </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="hasAssets"
+                  checked={personalInfo.hasAssetsInChina}
+                  onChange={(e) => setPersonalInfo(prev => ({ ...prev, hasAssetsInChina: e.target.checked }))}
+                  className="w-4 h-4"
+                />
+                <Label htmlFor="hasAssets" className="text-sm">
+                  我在中国境内有房产等固定资产
+                </Label>
+              </div>
             </div>
 
             <Separator />

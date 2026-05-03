@@ -156,6 +156,10 @@ export async function generateCoverLetter(
     travelPurpose: string;
     travelDates: string;
     itinerary: string;
+    employmentStatus: 'employed' | 'student' | 'retired' | 'unemployed' | 'self-employed';
+    fundingSource: 'salary' | 'parents' | 'pension' | 'unemployment-benefits' | 'savings' | 'other';
+    maritalStatus: 'single' | 'married-spouse-in-china' | 'married-spouse-abroad' | 'divorced' | 'widowed';
+    hasAssetsInChina: boolean;
   },
   completedItems: string[],
   issueItems: { id: number; description: string }[],
@@ -180,6 +184,61 @@ export async function generateCoverLetter(
     16: "Other supplementary materials"
   };
 
+  // Build intelligent prompt based on user's actual situation
+  let additionalRequirements = [];
+  
+  // Employment status handling
+  const employmentDescriptions = {
+    'employed': 'stable employment in China',
+    'student': 'student status with ongoing studies',
+    'retired': 'retirement with pension benefits',
+    'unemployed': 'current unemployment with unemployment benefits',
+    'self-employed': 'self-employment or business ownership'
+  };
+  
+  // Funding source handling
+  const fundingDescriptions = {
+    'salary': 'personal salary income',
+    'parents': 'financial support from parents',
+    'pension': 'pension benefits',
+    'unemployment-benefits': 'unemployment insurance benefits',
+    'savings': 'personal savings',
+    'other': 'other financial resources'
+  };
+  
+  // Marital status handling
+  const maritalDescriptions = {
+    'single': 'single status',
+    'married-spouse-in-china': 'marriage with spouse residing in China',
+    'married-spouse-abroad': 'marriage with spouse residing abroad',
+    'divorced': 'divorced status',
+    'widowed': 'widowed status'
+  };
+  
+  // Build supporting documents list - ONLY include what user actually completed
+  let supportingDocuments = [];
+  if (completedItems.includes("Identity card")) {
+    supportingDocuments.push("Identity card");
+  }
+  if (completedItems.includes("Employment certificate")) {
+    supportingDocuments.push("Employment certificate");
+  }
+  if (completedItems.includes("Bank statements")) {
+    supportingDocuments.push("Bank statements");
+  }
+  if (completedItems.includes("Business license")) {
+    supportingDocuments.push("Business license");
+  }
+  if (completedItems.includes("Household registration booklet")) {
+    supportingDocuments.push("Household registration booklet");
+  }
+  if (completedItems.includes("Marriage status certificate")) {
+    supportingDocuments.push("Marriage status certificate");
+  }
+  if (completedItems.includes("Other fixed asset proofs")) {
+    supportingDocuments.push("Fixed asset proofs");
+  }
+  
   const messages: ChatMessage[] = [
     {
       role: 'user',
@@ -191,23 +250,33 @@ Personal Information:
 - Travel Purpose (in Chinese): ${personalInfo.travelPurpose}
 - Travel Dates (in Chinese): ${personalInfo.travelDates}
 - Itinerary (in Chinese): ${personalInfo.itinerary}
+- Employment Status: ${employmentDescriptions[personalInfo.employmentStatus]} (this affects how you describe the applicant's situation)
+- Funding Source: ${fundingDescriptions[personalInfo.fundingSource]} (this affects how you describe financial support)
+- Marital Status: ${maritalDescriptions[personalInfo.maritalStatus]} (this affects family ties to China)
+- Has Assets in China: ${personalInfo.hasAssetsInChina ? 'Yes' : 'No'} (only mention assets if Yes)
 
-Completed Documents:
+Completed Documents (ONLY mention these exact documents, do not add any others):
 ${completedItems.map(item => `- ${item}`).join('\n')}
 
 Documents with Issues:
 ${issueItems.map(item => `- ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
 
-Requirements:
+CRITICAL REQUIREMENTS:
 1. Translate any Chinese information into natural English
 2. Expand on travel purposes with realistic details about why visiting France
 3. Provide professional explanations for any document issues
-4. Emphasize strong ties to China and intention to return
-5. Use formal, respectful tone appropriate for visa application
-6. Include all standard sections: purpose, itinerary, documents, ties to China, financial capacity, compliance commitment
-7. Make it personalized based on the provided information
+4. Emphasize strong ties to China and intention to return:
+   - For marital status: describe family ties appropriately based on ${maritalDescriptions[personalInfo.maritalStatus]}
+   - For employment: describe ${employmentDescriptions[personalInfo.employmentStatus]}
+   - For assets: ${personalInfo.hasAssetsInChina ? 'mention property or assets in China as strong ties' : 'DO NOT mention property or assets'}
+5. Describe financial capacity based on ${fundingDescriptions[personalInfo.fundingSource]}
+6. Use formal, respectful tone appropriate for visa application
+7. Include sections: purpose, itinerary, supporting documents (${supportingDocuments.join(', ') || 'general documents'}), ties to China, financial capacity, compliance commitment
+8. Make it personalized based on the provided information
+9. IMPORTANT: Only mention documents that the user actually completed. Do NOT add household registration booklet if not completed, do NOT add marriage certificate if not completed, etc.
+10. Be honest about the applicant's actual situation - if unemployed, do not fabricate employment; if student, describe student status; etc.
 
-The letter should be comprehensive, professional, and persuasive while maintaining honesty about any document limitations.`
+The letter should be comprehensive, professional, and persuasive while maintaining complete honesty about the applicant's actual situation.`
     }
   ];
 
