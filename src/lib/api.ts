@@ -258,23 +258,28 @@ Personal Information:
 Completed Documents (ONLY mention these exact documents, do not add any others):
 ${completedItems.map(item => `- ${item}`).join('\n')}
 
-Documents with Issues:
-${issueItems.map(item => `- ${itemNamesEn[item.id]}: ${item.description}`).join('\n')}
+Documents with Issues (IMPORTANT: These need special explanation in the letter):
+${issueItems.length > 0 ? issueItems.map(item => `- ${itemNamesEn[item.id]}: ${item.description}`).join('\n') : '- None'}
 
 CRITICAL REQUIREMENTS:
 1. Translate any Chinese information into natural English
 2. Expand on travel purposes with realistic details about why visiting France
-3. Provide professional explanations for any document issues
+3. IMPORTANT: For documents with issues - create a DEDICATED PARAGRAPH after the supporting documents section specifically explaining these issues:
+   ${issueItems.length > 0 ? issueItems.map(item => `   - For "${itemNamesEn[item.id]}": Explain that the user has the issue: "${item.description}" and provide a professional, reassuring explanation`).join('\n') : '   - No documents with issues to explain'}
+   - This paragraph should be titled "Additional Notes on Supporting Documents" or similar
+   - Provide honest but positive explanations that show the documents are still valid
+   - Example format: "Regarding [document name], I would like to clarify that [explanation based on user's issue description]. Despite this, the document demonstrates..."
 4. Emphasize strong ties to China and intention to return:
    - For marital status: describe family ties appropriately based on ${maritalDescriptions[personalInfo.maritalStatus]}
    - For employment: describe ${employmentDescriptions[personalInfo.employmentStatus]}
    - For assets: ${personalInfo.hasAssetsInChina ? 'mention property or assets in China as strong ties' : 'DO NOT mention property or assets'}
 5. Describe financial capacity based on ${fundingDescriptions[personalInfo.fundingSource]}
 6. Use formal, respectful tone appropriate for visa application
-7. Include sections: purpose, itinerary, supporting documents (${supportingDocuments.join(', ') || 'general documents'}), ties to China, financial capacity, compliance commitment
+7. Include sections: purpose, itinerary, supporting documents (${supportingDocuments.join(', ') || 'general documents'})${issueItems.length > 0 ? ', additional notes on documents with issues' : ''}, ties to China, financial capacity, compliance commitment
 8. Make it personalized based on the provided information
 9. IMPORTANT: Only mention documents that the user actually completed. Do NOT add household registration booklet if not completed, do NOT add marriage certificate if not completed, etc.
 10. Be honest about the applicant's actual situation - if unemployed, do not fabricate employment; if student, describe student status; etc.
+${issueItems.length > 0 ? `11. CRITICAL: The user has specifically marked ${issueItems.length} document(s) with issues and provided explanations. You MUST include a dedicated paragraph explaining these issues. This is essential for the visa application.` : ''}
 
 The letter should be comprehensive, professional, and persuasive while maintaining complete honesty about the applicant's actual situation.`
     }
