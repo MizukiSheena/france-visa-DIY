@@ -240,15 +240,15 @@ const CoverLetterGenerator = ({ itemStatuses, onBack }: CoverLetterGeneratorProp
             <div className="space-y-2">
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>生成次数</span>
-                <span>{getUserApiKey() ? '无限制' : `${3 - generationCount}/3`}</span>
+                <span>{getUserApiKey() ? '无限制' : `${generationCount}/3`}</span>
               </div>
               <Button
                 onClick={handleGenerateCoverLetter}
                 className="w-full bg-gradient-to-r from-primary to-accent hover:shadow-lg transition-all duration-200"
-                disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber || (getUserApiKey() ? false : generationCount >= 3)}
+                disabled={isGenerating || !personalInfo.name || !personalInfo.passportNumber || (getUserApiKey() ? false : generationCount <= 0)}
               >
                 <FileText className="w-4 h-4 mr-2" />
-                {isGenerating ? "正在生成..." : getUserApiKey() ? "生成Cover Letter" : generationCount >= 3 ? "已达到生成限制" : "生成Cover Letter"}
+                {isGenerating ? "正在生成..." : getUserApiKey() ? "生成Cover Letter" : generationCount <= 0 ? "已达到生成限制" : "生成Cover Letter"}
               </Button>
             </div>
           </CardContent>
